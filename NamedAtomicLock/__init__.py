@@ -67,7 +67,7 @@ class NamedAtomicLock(object):
         if not os.access(lockDir, os.W_OK):
             raise ValueError('Cannot write to lock directory: %s' %(lockDir,))
         self.lockPath = lockDir + os.sep + name
-        
+
         self.held = False
         self.acquiredAt = None
 
@@ -94,31 +94,33 @@ class NamedAtomicLock(object):
                 pollTime = timeout / 10.0
             else:
                 pollTime = DEFAULT_POLL_TIME
-            
+
             endTime = time.time() + timeout
             keepGoing = lambda : bool(time.time() < endTime)
         else:
             pollTime = DEFAULT_POLL_TIME
             keepGoing = lambda : True
 
-                    
+
 
         success = False
         while keepGoing():
             try:
-                os.mkdir(self.lockPath) 
+                os.mkdir(self.lockPath)
                 success = True
                 break
             except:
                 time.sleep(pollTime)
                 if self.maxLockAge:
-                    if os.path.exists(self.lockPath) and os.stat(self.lockPath).st_mtime < time.time() - self.maxLockAge:
-                        try:
+                    if not os.path.exists(self.lockPath):
+                        continue
+                    try:
+                        if os.stat(self.lockPath).st_mtime < time.time() - self.maxLockAge:
                             os.rmdir(self.lockPath)
-                        except:
-                            # If we did not remove the lock, someone else is at the same point and contending. Let them win.
-                            time.sleep(pollTime)
-        
+                    except:
+                        # If we did not remove the lock, someone else is at the same point and contending. Let them win.
+                        time.sleep(pollTime)
+
         if success is True:
             self.acquiredAt = time.time()
 
@@ -138,7 +140,7 @@ class NamedAtomicLock(object):
                 return False # We were not holding the lock
             else:
                 self.held = True # If we have force release set, pretend like we held its
-        
+
         if not os.path.exists(self.lockPath):
             self.held = False
             self.acquiredAt = None
@@ -165,7 +167,7 @@ class NamedAtomicLock(object):
     def __checkExpiration(self, mtime=None):
         '''
             __checkExpiration - Check if we have expired
-            
+
             @param mtime <int> - Optional mtime if known, otherwise will be gathered
 
             @return <bool> - True if we did expire, otherwise False
@@ -193,12 +195,12 @@ class NamedAtomicLock(object):
         '''
         if not os.path.exists(self.lockPath):
             return False
-        
+
         try:
             mtime = os.stat(self.lockPath).st_mtime
         except FileNotFoundError as e:
             return False
-        
+
         if self.__checkExpiration(mtime):
             return False
 
@@ -214,7 +216,7 @@ class NamedAtomicLock(object):
         # If we don't hold it currently, return False
         if self.held is False:
             return False
-        
+
         # Otherwise if we think we hold it, but it is not held, we have lost it.
         if not self.isHeld:
             self.acquiredAt = None
